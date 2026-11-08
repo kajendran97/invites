@@ -1,0 +1,781 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Wedding Invite Builder</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Great+Vibes&family=Pinyon+Script&family=Marcellus&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+  :root {
+    --bg: #f4f1ea; --panel: #ffffff; --soft: #faf8f3; --ink: #2f2719; --muted: #6f6450; --line: #e3dccd;
+    --accent: #a8803f; --accent-ink: #ffffff; --accent-faint: #f3e9d4; --err: #a3392a; --err-bg: #fbecea; --ok: #2f6f4f;
+    --radius: 10px;
+    --caps: "Marcellus", Georgia, serif;
+    --ui: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    color-scheme: light;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 var(--ui); }
+  button, input, select, textarea { font: inherit; color: inherit; }
+
+  header.bar {
+    position: sticky; top: 0; z-index: 10; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px;
+    padding: 12px 20px; background: var(--panel); border-bottom: 1px solid var(--line);
+  }
+  .brand { display: flex; align-items: baseline; gap: 10px; margin-right: auto; }
+  .brand b { font-family: "Great Vibes", cursive; font-weight: 400; font-size: 30px; color: var(--accent); line-height: 1; }
+  .brand span { font-family: var(--caps); letter-spacing: .12em; text-transform: uppercase; font-size: 12px; color: var(--muted); }
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+  .btn { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); background: var(--panel); color: var(--ink);
+    padding: 8px 14px; border-radius: 999px; cursor: pointer; text-decoration: none; white-space: nowrap; }
+  .btn:hover { border-color: var(--accent); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+  .btn.primary:hover { filter: brightness(.95); }
+  .btn.small { padding: 4px 10px; font-size: 13px; }
+  .btn:focus-visible, .icon:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+  .btn:disabled { opacity: .5; cursor: default; }
+  .icon { border: 1px solid var(--line); background: var(--panel); width: 32px; height: 32px; border-radius: 8px; cursor: pointer; display: inline-grid; place-items: center; padding: 0; }
+  .icon:hover { border-color: var(--accent); }
+  .icon:disabled { opacity: .35; cursor: default; }
+
+  .notice { margin: 12px 20px 0; padding: 10px 14px; border-radius: var(--radius); background: var(--accent-faint); border: 1px solid var(--line); }
+  .notice.err { background: var(--err-bg); border-color: #efc9c3; color: var(--err); }
+
+  .tabs { display: none; gap: 6px; padding: 10px 16px 0; }
+  .tabs button { flex: 1; padding: 8px; border: 1px solid var(--line); background: var(--panel); border-radius: 999px; cursor: pointer; }
+  .tabs button[aria-selected="true"] { background: var(--ink); color: #fff; border-color: var(--ink); }
+
+  main { display: grid; grid-template-columns: minmax(0, 1fr) minmax(360px, 460px); gap: 20px; padding: 16px 20px 40px; max-width: 1280px; margin: 0 auto; }
+  #formPane { display: grid; gap: 16px; align-content: start; min-width: 0; }
+  #previewPane { position: sticky; top: 76px; height: calc(100vh - 92px); display: flex; flex-direction: column; gap: 8px; }
+
+  fieldset { margin: 0; padding: 16px 18px 18px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); min-width: 0; }
+  legend { font-family: var(--caps); letter-spacing: .1em; text-transform: uppercase; font-size: 13px; color: var(--accent); padding: 0 6px; }
+  .help { color: var(--muted); font-size: 13px; margin: 0 0 12px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px 14px; }
+  .grid .full { grid-column: 1 / -1; }
+  .sub { font-family: var(--caps); font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin: 6px 0 -4px; grid-column: 1 / -1; }
+  label.f { display: grid; gap: 4px; font-size: 13px; color: var(--muted); min-width: 0; }
+  label.f .req { color: var(--err); }
+  input[type=text], input[type=url], input[type=date], input[type=time], input[type=number], input[type=tel], select, textarea {
+    width: 100%; min-width: 0; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--soft); color: var(--ink); font-size: 15px;
+  }
+  textarea { min-height: 64px; resize: vertical; }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-faint); }
+  [aria-invalid="true"] { border-color: var(--err) !important; background: var(--err-bg) !important; }
+
+  .rows { display: grid; gap: 10px; }
+  .row { display: grid; gap: 8px; align-items: end; padding: 10px; border: 1px dashed var(--line); border-radius: 8px; background: var(--soft); }
+  .row.contact { grid-template-columns: 1.1fr 1.2fr 1.3fr auto; }
+  .row.tl { grid-template-columns: 110px 1.2fr 1.6fr auto auto; }
+  .row .tools { display: flex; gap: 4px; }
+  .row label.chk { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); padding-bottom: 8px; white-space: nowrap; }
+  .row input[type=text], .row input[type=time], .row input[type=tel] { background: var(--panel); }
+  .add { margin-top: 10px; }
+
+  .themes { display: flex; flex-wrap: wrap; gap: 10px; }
+  .theme { position: relative; }
+  .theme input { position: absolute; opacity: 0; }
+  .theme span { display: flex; align-items: center; gap: 8px; padding: 8px 14px 8px 8px; border: 1px solid var(--line); border-radius: 999px; cursor: pointer; background: var(--soft); text-transform: capitalize; }
+  .theme i { width: 26px; height: 26px; border-radius: 50%; border: 3px solid var(--sw-bg); background: var(--sw); box-shadow: 0 0 0 1px var(--line); }
+  .theme input:checked + span { border-color: var(--ink); box-shadow: 0 0 0 1px var(--ink); background: var(--panel); }
+  .theme input:focus-visible + span { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+  .photo { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+  .thumb { width: 96px; height: 96px; border-radius: 8px; border: 1px solid var(--line); background: var(--soft) center/cover no-repeat; display: grid; place-items: center; color: var(--muted); font-size: 12px; text-align: center; flex: none; }
+
+  .out { display: grid; gap: 10px; }
+  .errors { margin: 0; padding: 10px 14px 10px 30px; border-radius: 8px; background: var(--err-bg); color: var(--err); }
+  .warnings { margin: 0; padding: 10px 14px 10px 30px; border-radius: 8px; background: var(--accent-faint); color: var(--ink); }
+  .result { padding: 12px 14px; border-radius: 8px; border: 1px solid #cfe3d6; background: #eef7f1; display: grid; gap: 8px; }
+  .result code { word-break: break-all; font-size: 13px; background: #fff; padding: 2px 6px; border-radius: 4px; }
+  .result ol { margin: 0; padding-left: 20px; }
+
+  .ptools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; background: var(--panel); }
+  .seg button { border: 0; background: none; padding: 6px 12px; cursor: pointer; font-size: 13px; }
+  .seg button[aria-pressed="true"] { background: var(--ink); color: #fff; }
+  .frame { flex: 1; min-height: 0; border: 1px solid var(--line); border-radius: 18px; overflow: hidden; background: #fff; box-shadow: 0 10px 30px -18px rgba(0,0,0,.35); }
+  .frame iframe { width: 100%; height: 100%; border: 0; display: block; }
+  .ptools .note { color: var(--muted); font-size: 12px; margin-left: auto; }
+
+  @media (max-width: 900px) {
+    header.bar { padding: 10px 16px; position: static; }
+    .tabs { display: flex; }
+    main { grid-template-columns: 1fr; padding: 12px 16px 32px; }
+    #previewPane { position: static; height: 78vh; }
+    main[data-tab="form"] #previewPane { display: none; }
+    main[data-tab="preview"] #formPane { display: none; }
+    .row.contact { grid-template-columns: 1fr 1fr; }
+    .row.contact .tools { grid-column: 1 / -1; justify-content: flex-end; }
+    .row.tl { grid-template-columns: 96px 1fr; }
+    .row.tl .note-f { grid-column: 1 / -1; }
+  }
+</style>
+</head>
+<body>
+
+<header class="bar">
+  <div class="brand"><b>Invite Builder</b><span>Wedding invitations</span></div>
+  <div class="actions">
+    <button class="btn" type="button" id="btnSample">Start from sample</button>
+    <button class="btn" type="button" id="btnBlank">New blank</button>
+    <button class="btn" type="button" id="btnLoad">Load existing…</button>
+    <input type="file" id="loadFile" accept=".html,text/html" hidden>
+  </div>
+</header>
+
+<p class="notice err" id="noTemplate" hidden>Couldn't load <code>template/invite.html</code>. Open this builder from a web server, such as GitHub Pages or a local server, not by double-clicking the file.</p>
+<p class="notice" id="flash" hidden></p>
+
+<div class="tabs" role="tablist" aria-label="View">
+  <button type="button" role="tab" id="tabForm" aria-selected="true">Form</button>
+  <button type="button" role="tab" id="tabPreview" aria-selected="false">Preview</button>
+</div>
+
+<main id="main" data-tab="form">
+  <form id="formPane" novalidate autocomplete="off">
+
+    <fieldset>
+      <legend>Couple &amp; families</legend>
+      <div class="grid">
+        <p class="sub">First name shown</p>
+        <label class="f"><span>Name <span class="req">*</span></span><input type="text" data-path="person1.name" id="p1name" placeholder="Nimal"></label>
+        <label class="f">Relation line<input type="text" data-path="person1.relation" placeholder="Son of"></label>
+        <label class="f full">Parents<input type="text" data-path="person1.parents" placeholder="Mr. … &amp; Mrs. …"></label>
+        <p class="sub">Second name shown</p>
+        <label class="f"><span>Name <span class="req">*</span></span><input type="text" data-path="person2.name" id="p2name" placeholder="Kumudu"></label>
+        <label class="f">Relation line<input type="text" data-path="person2.relation" placeholder="Daughter of"></label>
+        <label class="f full">Parents<input type="text" data-path="person2.parents" placeholder="Mr. … &amp; Mrs. …"></label>
+        <label class="f">Monogram<input type="text" data-path="monogram" id="monogram" placeholder="Auto: N &amp; K"></label>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Date &amp; time</legend>
+      <div class="grid">
+        <label class="f"><span>Wedding date <span class="req">*</span></span><input type="date" data-path="date" id="date"></label>
+        <label class="f">Time zone<select data-path="utcOffset" id="utcOffset"></select></label>
+        <label class="f">Event starts<input type="time" data-path="startTime"></label>
+        <label class="f">Event ends<input type="time" data-path="endTime"></label>
+        <label class="f">Main ceremony name<input type="text" data-path="ceremony.label" placeholder="Poruwa ceremony"></label>
+        <label class="f"><span>Ceremony time <span class="req">*</span></span><input type="time" data-path="ceremony.time" id="cerTime"></label>
+      </div>
+      <p class="help" style="margin:10px 0 0">The countdown runs to the ceremony time. "Add to calendar" uses the start and end times.</p>
+    </fieldset>
+
+    <fieldset>
+      <legend>Venue</legend>
+      <div class="grid">
+        <label class="f"><span>Venue name <span class="req">*</span></span><input type="text" data-path="venue.name" id="venueName" placeholder="Grand Ballroom"></label>
+        <label class="f">Town / area<input type="text" data-path="venue.area" placeholder="Colombo"></label>
+        <label class="f full">Google Maps search (optional)<input type="text" data-path="venue.mapsQuery" placeholder="Leave blank to search for the venue name and area"></label>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Contacts &amp; RSVP</legend>
+      <p class="help">Guests RSVP over WhatsApp to the person they pick. The WhatsApp number fills in from the phone number using the country code. Edit it if it's different.</p>
+      <div class="grid" style="margin-bottom:12px">
+        <label class="f">Country code<input type="tel" id="cc" value="94" inputmode="numeric" placeholder="94"></label>
+        <label class="f">Max guests per RSVP<input type="number" data-path="rsvp.maxGuests" min="1" max="50" placeholder="10"></label>
+      </div>
+      <div class="rows" id="contactRows"></div>
+      <button class="btn small add" type="button" id="addContact">+ Add contact</button>
+    </fieldset>
+
+    <fieldset>
+      <legend>The day (schedule)</legend>
+      <p class="help">Shown as a timeline. Tick "Key" to highlight the main moment. Leave every row empty to hide the section.</p>
+      <div class="rows" id="tlRows"></div>
+      <button class="btn small add" type="button" id="addTl">+ Add moment</button>
+    </fieldset>
+
+    <fieldset>
+      <legend>Theme &amp; photo</legend>
+      <div class="themes" id="themes"></div>
+      <div class="photo" style="margin-top:16px">
+        <div class="thumb" id="thumb">No photo</div>
+        <div style="display:grid;gap:8px;flex:1;min-width:200px">
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <label class="btn small" for="photoFile">Choose photo…</label>
+            <input type="file" id="photoFile" accept="image/*" hidden>
+            <button class="btn small" type="button" id="photoRemove">Remove</button>
+          </div>
+          <label class="f">Photo description (for screen readers)<input type="text" data-path="photo.alt" placeholder="Illustration of the couple…"></label>
+          <p class="help" id="photoNote" style="margin:0">Square-ish images work best. Large photos are resized automatically.</p>
+        </div>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Wording</legend>
+      <div class="grid" id="wordingGrid"></div>
+      <label class="f" style="margin-top:12px">Lamp blessings (one per line)<textarea id="blessings" rows="4"></textarea></label>
+    </fieldset>
+
+    <fieldset>
+      <legend>Publish</legend>
+      <div class="grid">
+        <label class="f"><span>Folder name <span class="req">*</span></span><input type="text" id="slug" placeholder="nimal-kumudu" spellcheck="false"></label>
+        <label class="f">Site address (GitHub Pages)<input type="url" id="baseUrl" placeholder="https://username.github.io/invites/" spellcheck="false"></label>
+      </div>
+      <p class="help" style="margin:10px 0 0">The invitation will be at <code id="finalUrl">…</code>. The site address is needed for the WhatsApp link preview image.</p>
+      <div class="out" style="margin-top:14px">
+        <ul class="errors" id="errors" hidden></ul>
+        <ul class="warnings" id="warnings" hidden></ul>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn primary" type="button" id="btnZip">Download invitation (.zip)</button>
+          <button class="btn" type="button" id="btnHtml">Download index.html only</button>
+        </div>
+        <div class="result" id="result" hidden>
+          <strong id="resultTitle">Ready!</strong>
+          <ol>
+            <li>Unzip it. You'll get a folder named <code id="rFolder"></code>.</li>
+            <li>On GitHub, open the <b>invites</b> repo → <b>Add file → Upload files</b> → drag that folder in → <b>Commit changes</b>.</li>
+            <li>After about a minute, share: <code id="rUrl"></code></li>
+          </ol>
+          <div>Personal link for a guest: <code id="rGuest"></code> <button class="btn small" type="button" id="copyLink">Copy link</button></div>
+        </div>
+      </div>
+    </fieldset>
+  </form>
+
+  <section id="previewPane" aria-label="Live preview">
+    <div class="ptools">
+      <div class="seg" role="group" aria-label="Preview view">
+        <button type="button" id="viewLetter" aria-pressed="true">Letter</button>
+        <button type="button" id="viewCover" aria-pressed="false">Cover</button>
+      </div>
+      <button class="btn small" type="button" id="openTab">Open in new tab</button>
+      <span class="note" id="pNote">Live preview</span>
+    </div>
+    <div class="frame"><iframe id="preview" title="Invitation preview"></iframe></div>
+  </section>
+</main>
+
+<script>
+(function () {
+  "use strict";
+
+  // ---------- Constants ----------
+  var THEMES = {
+    gold:    { linen: "#efeae1", card: "#fffdf8", accent: "#a8803f", soft: "#c9a96a", faint: "#efe3c9", ink: "#5b4526", inkSoft: "#846e4b" },
+    rose:    { linen: "#f3e6e6", card: "#fffbfa", accent: "#a85d68", soft: "#d39aa2", faint: "#f3dade", ink: "#5a3238", inkSoft: "#85575d" },
+    emerald: { linen: "#e6ece6", card: "#fbfdfb", accent: "#2f6f55", soft: "#7fae96", faint: "#d8e8de", ink: "#26413a", inkSoft: "#50695f" },
+    navy:    { linen: "#e6e8ee", card: "#fcfcfe", accent: "#2e3f6e", soft: "#8a97bd", faint: "#dde2ef", ink: "#232b45", inkSoft: "#535c7a" }
+  };
+  var WORDING = [
+    ["eyebrow", "Cover heading", "The Wedding Invitation"],
+    ["tap", "Cover button hint", "Tap to open"],
+    ["joy", "Opening line", "With joyful hearts"],
+    ["honour", "Invitation sentence", "request the pleasure of your presence at the celebration of the marriage of their loving children.", true],
+    ["saveTheDate", "Date section title", "Save the Date"],
+    ["theDay", "Schedule section title", "The Day"],
+    ["theVenue", "Venue section title", "The Venue"],
+    ["rsvpTitle", "RSVP section title", "RSVP"],
+    ["rsvpLead", "RSVP intro", "Kindly let us know if you can join us, so we can prepare a place for you.", true],
+    ["lampHint", "Lamp hint", "Tap the lamp to send a blessing"],
+    ["closing", "Closing message", "Your presence is the greatest gift. Thank you for being part of our story.", true],
+    ["married", "Shown after the ceremony", "Just married!"]
+  ];
+  var DEFAULT_BLESSINGS = [
+    "Ayubowan! May your life together be long and happy.",
+    "May your home always be filled with light.",
+    "Wishing you love, laughter and a lifetime of togetherness.",
+    "May every year bring you closer than the last."
+  ];
+  var OFFSETS = ["-10:00", "-08:00", "-07:00", "-06:00", "-05:00", "-04:00", "-03:00", "+00:00", "+01:00", "+02:00", "+03:00", "+04:00",
+    "+05:00", "+05:30", "+05:45", "+06:00", "+07:00", "+08:00", "+09:00", "+09:30", "+10:00", "+11:00", "+12:00"];
+  var OFFSET_NAMES = { "+05:30": "Sri Lanka / India", "+00:00": "UK (winter)", "+01:00": "UK (summer) / Central Europe", "+04:00": "UAE", "+03:00": "Qatar / Saudi",
+    "+08:00": "Singapore / Malaysia", "+10:00": "Sydney (winter)", "+11:00": "Sydney (summer)", "+12:00": "New Zealand", "-05:00": "New York (winter)", "-04:00": "New York (summer)", "+05:45": "Nepal" };
+  var MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  var DRAFT_KEY = "wib-draft-v1", BASE_KEY = "wib-base-v1";
+
+  var state = { template: "", sample: null, photo: null, keepPhoto: null, slugTouched: false, view: "letter" };
+
+  // ---------- Helpers ----------
+  function $(id) { return document.getElementById(id); }
+  function str(v) { return v == null ? "" : String(v).trim(); }
+  function make(tag, props, kids) {
+    var e = document.createElement(tag);
+    Object.keys(props || {}).forEach(function (k) {
+      if (k === "text") e.textContent = props[k];
+      else if (k === "class") e.className = props[k];
+      else if (k in e && k !== "list") e[k] = props[k];
+      else e.setAttribute(k, props[k]);
+    });
+    (kids || []).forEach(function (c) { e.appendChild(c); });
+    return e;
+  }
+  function getPath(o, p) { return p.split(".").reduce(function (a, k) { return a && a[k] != null ? a[k] : ""; }, o); }
+  function setPath(o, p, v) { var ks = p.split("."), last = ks.pop(); ks.reduce(function (a, k) { return (a[k] = a[k] || {}); }, o)[last] = v; }
+  function debounce(fn, ms) { var t; return function () { clearTimeout(t); t = setTimeout(fn, ms); }; }
+  function store(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* storage unavailable */ } }
+  function recall(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function slugify(s) {
+    return str(s).normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  }
+  function escAttr(s) { return String(s).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+  function jsonForScript(d) {
+    return JSON.stringify(d, null, 2).replace(/</g, "\\u003c").replace(/>/g, "\\u003e").replace(/&/g, "\\u0026")
+      .replace(/\u2028/g, "\\u2028").replace(/\u2029/g, "\\u2029");
+  }
+  function extractData(html) {
+    var m = /<script id="invite-data" type="application\/json">([\s\S]*?)<\/script>/.exec(html);
+    if (!m) throw new Error("No invitation data found in that file.");
+    return JSON.parse(m[1]);
+  }
+  function toIntl(phone, cc) {
+    var d = str(phone).replace(/[^\d+]/g, "");
+    if (!d) return "";
+    if (d.charAt(0) === "+") return d.slice(1).replace(/\D/g, "");
+    if (d.slice(0, 2) === "00") return d.slice(2);
+    if (d.charAt(0) === "0") return str(cc).replace(/\D/g, "") + d.slice(1);
+    return d;
+  }
+  function flash(msg) { var f = $("flash"); f.textContent = msg; f.hidden = !msg; }
+  function baseUrl() {
+    var b = str($("baseUrl").value);
+    if (b && !/\/$/.test(b)) b += "/";
+    return b;
+  }
+  function longDate(d) { var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(str(d)); return m ? (+m[3]) + " " + MONTHS[+m[2] - 1] + " " + m[1] : ""; }
+
+  // ---------- Build the static form pieces ----------
+  OFFSETS.forEach(function (o) { $("utcOffset").appendChild(make("option", { value: o, text: "UTC" + o + (OFFSET_NAMES[o] ? " · " + OFFSET_NAMES[o] : "") })); });
+  Object.keys(THEMES).forEach(function (k) {
+    var t = THEMES[k];
+    var input = make("input", { type: "radio", name: "theme", value: k });
+    var sw = make("i"); sw.style.setProperty("--sw", t.accent); sw.style.setProperty("--sw-bg", t.linen);
+    $("themes").appendChild(make("label", { class: "theme" }, [input, make("span", {}, [sw, document.createTextNode(k)])]));
+  });
+  WORDING.forEach(function (w) {
+    var field = w[3] ? make("textarea", { rows: 2 }) : make("input", { type: "text" });
+    field.setAttribute("data-path", "wording." + w[0]);
+    field.placeholder = w[2];
+    var lab = make("label", { class: "f" + (w[3] ? " full" : "") }, [document.createTextNode(w[1]), field]);
+    $("wordingGrid").appendChild(lab);
+  });
+
+  // ---------- Repeating rows ----------
+  function contactRow(c) {
+    c = c || {};
+    var name = make("input", { type: "text", value: str(c.name), placeholder: "Nimal", "aria-label": "Contact name" });
+    var phone = make("input", { type: "tel", value: str(c.phone), placeholder: "077 000 0001", "aria-label": "Phone number as shown" });
+    var wa = make("input", { type: "tel", value: str(c.whatsapp), placeholder: "94770000001", inputMode: "numeric", "aria-label": "WhatsApp number with country code" });
+    if (str(c.whatsapp) && str(c.whatsapp) !== toIntl(c.phone, $("cc").value)) wa.dataset.touched = "1";
+    phone.addEventListener("input", function () { if (wa.dataset.touched !== "1") wa.value = toIntl(phone.value, $("cc").value); });
+    wa.addEventListener("input", function () { wa.dataset.touched = "1"; });
+    var remove = make("button", { type: "button", class: "icon", title: "Remove contact", "aria-label": "Remove contact", text: "✕" });
+    var row = make("div", { class: "row contact" }, [
+      make("label", { class: "f" }, [document.createTextNode("Name"), name]),
+      make("label", { class: "f" }, [document.createTextNode("Phone (as shown)"), phone]),
+      make("label", { class: "f" }, [document.createTextNode("WhatsApp number"), wa]),
+      make("div", { class: "tools" }, [remove])
+    ]);
+    row._get = function () { return { name: str(name.value), phone: str(phone.value), whatsapp: str(wa.value).replace(/\D/g, "") }; };
+    row._wa = wa;
+    remove.addEventListener("click", function () { row.remove(); syncRows(); changed(); });
+    $("contactRows").appendChild(row);
+    syncRows();
+  }
+  function tlRow(t) {
+    t = t || {};
+    var time = make("input", { type: "time", value: str(t.time), "aria-label": "Time" });
+    var title = make("input", { type: "text", value: str(t.title), placeholder: "Guests arrive", "aria-label": "What happens" });
+    var note = make("input", { type: "text", value: str(t.note), placeholder: "Short note (optional)", "aria-label": "Note" });
+    var key = make("input", { type: "checkbox", checked: !!t.key });
+    key.addEventListener("change", function () {
+      if (key.checked) Array.prototype.forEach.call($("tlRows").children, function (r) { if (r !== row) r._key.checked = false; });
+    });
+    var up = make("button", { type: "button", class: "icon", title: "Move up", "aria-label": "Move up", text: "↑" });
+    var down = make("button", { type: "button", class: "icon", title: "Move down", "aria-label": "Move down", text: "↓" });
+    var remove = make("button", { type: "button", class: "icon", title: "Remove", "aria-label": "Remove moment", text: "✕" });
+    var row = make("div", { class: "row tl" }, [
+      make("label", { class: "f" }, [document.createTextNode("Time"), time]),
+      make("label", { class: "f" }, [document.createTextNode("What happens"), title]),
+      make("label", { class: "f note-f" }, [document.createTextNode("Note"), note]),
+      make("label", { class: "chk" }, [key, document.createTextNode("Key")]),
+      make("div", { class: "tools" }, [up, down, remove])
+    ]);
+    row._key = key;
+    row._get = function () { return { time: str(time.value), title: str(title.value), note: str(note.value), key: key.checked }; };
+    up.addEventListener("click", function () { if (row.previousElementSibling) row.parentNode.insertBefore(row, row.previousElementSibling); syncRows(); changed(); });
+    down.addEventListener("click", function () { if (row.nextElementSibling) row.parentNode.insertBefore(row.nextElementSibling, row); syncRows(); changed(); });
+    remove.addEventListener("click", function () { row.remove(); syncRows(); changed(); });
+    $("tlRows").appendChild(row);
+    syncRows();
+  }
+  function syncRows() {
+    var tls = $("tlRows").children;
+    Array.prototype.forEach.call(tls, function (r, i) {
+      var b = r.querySelectorAll(".tools .icon");
+      b[0].disabled = i === 0; b[1].disabled = i === tls.length - 1;
+    });
+    $("addContact").disabled = $("contactRows").children.length >= 4;
+    $("addTl").disabled = tls.length >= 10;
+  }
+  $("addContact").addEventListener("click", function () { contactRow(); changed(); });
+  $("addTl").addEventListener("click", function () { tlRow(); changed(); });
+
+  // ---------- Form <-> data ----------
+  function readForm() {
+    var d = {};
+    Array.prototype.forEach.call(document.querySelectorAll("[data-path]"), function (f) { setPath(d, f.getAttribute("data-path"), str(f.value)); });
+    d.rsvp.maxGuests = parseInt(d.rsvp.maxGuests, 10) || 10;
+    var th = document.querySelector("input[name=theme]:checked");
+    d.theme = th ? th.value : "gold";
+    d.contacts = Array.prototype.map.call($("contactRows").children, function (r) { return r._get(); })
+      .filter(function (c) { return c.name || c.phone || c.whatsapp; });
+    d.timeline = Array.prototype.map.call($("tlRows").children, function (r) { return r._get(); })
+      .filter(function (t) { return t.time || t.title || t.note; });
+    d.blessings = $("blessings").value.split("\n").map(str).filter(Boolean);
+    var photo = { alt: d.photo.alt };
+    if (state.photo) { photo.file = state.photo.name; photo.width = state.photo.width; photo.height = state.photo.height; }
+    else if (state.keepPhoto) { photo.file = state.keepPhoto.file; photo.width = state.keepPhoto.width; photo.height = state.keepPhoto.height; }
+    d.photo = photo;
+    return d;
+  }
+  function fillForm(d) {
+    d = d || {};
+    Array.prototype.forEach.call(document.querySelectorAll("[data-path]"), function (f) {
+      var p = f.getAttribute("data-path"), v = getPath(d, p);
+      if (p.indexOf("wording.") === 0 && !str(v)) v = f.placeholder;
+      if (p === "utcOffset" && !str(v)) v = "+05:30";
+      f.value = v == null ? "" : String(v);
+    });
+    var th = document.querySelector("input[name=theme][value=" + (THEMES[d.theme] ? d.theme : "gold") + "]");
+    th.checked = true;
+    $("contactRows").textContent = "";
+    var cs = Array.isArray(d.contacts) && d.contacts.length ? d.contacts : [{}, {}];
+    cs.forEach(contactRow);
+    $("tlRows").textContent = "";
+    (Array.isArray(d.timeline) && d.timeline.length ? d.timeline : [{}, {}, {}]).forEach(tlRow);
+    $("blessings").value = (Array.isArray(d.blessings) && d.blessings.length ? d.blessings : DEFAULT_BLESSINGS).join("\n");
+  }
+
+  // ---------- Photo ----------
+  function loadImage(blob) {
+    return new Promise(function (res, rej) {
+      var url = URL.createObjectURL(blob), img = new Image();
+      img.onload = function () { res({ img: img, url: url }); };
+      img.onerror = function () { URL.revokeObjectURL(url); rej(new Error("That file isn't an image the browser can read.")); };
+      img.src = url;
+    });
+  }
+  function canvasBlob(cv, type, q) { return new Promise(function (res) { cv.toBlob(res, type, q); }); }
+  async function setPhoto(blob) {
+    var loaded = await loadImage(blob), img = loaded.img;
+    var w = img.naturalWidth, h = img.naturalHeight, scale = Math.min(1, 1400 / Math.max(w, h));
+    var out = blob, name = "photo.webp";
+    if (!(scale === 1 && blob.type === "image/webp" && blob.size < 700 * 1024)) {
+      w = Math.round(w * scale); h = Math.round(h * scale);
+      var cv = make("canvas", { width: w, height: h });
+      cv.getContext("2d").drawImage(img, 0, 0, w, h);
+      out = await canvasBlob(cv, "image/webp", 0.86);
+      if (!out || out.type !== "image/webp") { out = await canvasBlob(cv, "image/jpeg", 0.86); name = "photo.jpg"; }
+    }
+    URL.revokeObjectURL(loaded.url);
+    if (state.photo) URL.revokeObjectURL(state.photo.url);
+    var finalImg = await loadImage(out);
+    state.photo = { blob: out, url: finalImg.url, img: finalImg.img, name: name, width: w, height: h };
+    state.keepPhoto = null;
+    showThumb();
+  }
+  function showThumb() {
+    var t = $("thumb");
+    if (state.photo) { t.style.backgroundImage = "url(" + state.photo.url + ")"; t.textContent = ""; }
+    else { t.style.backgroundImage = ""; t.textContent = state.keepPhoto ? "Keeping " + state.keepPhoto.file : "No photo"; }
+    $("photoNote").textContent = state.keepPhoto && !state.photo
+      ? "The existing " + state.keepPhoto.file + " in the folder will be kept. Choose a photo to replace it."
+      : "Square-ish images work best. Large photos are resized automatically.";
+  }
+  $("photoFile").addEventListener("change", function () {
+    var f = this.files && this.files[0];
+    this.value = "";
+    if (!f) return;
+    state.samplePhoto = false;
+    setPhoto(f).then(changed, function (e) { flash(e.message); });
+  });
+  $("photoRemove").addEventListener("click", function () {
+    if (state.photo) URL.revokeObjectURL(state.photo.url);
+    state.photo = null; state.keepPhoto = null; showThumb(); changed();
+  });
+  async function loadSamplePhoto() {
+    try {
+      var r = await fetch("template/sample-photo.webp");
+      if (r.ok) await setPhoto(await r.blob());
+    } catch (e) { /* preview just shows no photo */ }
+  }
+
+  // ---------- Build the invitation HTML ----------
+  function buildHtml(d, opts) {
+    opts = opts || {};
+    var n1 = str(d.person1.name), n2 = str(d.person2.name);
+    var venueLine = [str(d.venue.name), str(d.venue.area)].filter(Boolean).join(", ");
+    var title = n1 + " & " + n2 + " Wedding";
+    var desc = ["You are warmly invited to the wedding of " + n1 + " & " + n2, longDate(d.date), venueLine].filter(Boolean).join(" · ");
+    var base = baseUrl(), slug = str($("slug").value);
+    var html = state.template;
+    html = html.replace(/(<script id="invite-data" type="application\/json">)[\s\S]*?(<\/script>)/, function (m, a, b) {
+      return a + "\n" + jsonForScript(opts.dataOverride || d) + "\n" + b;
+    });
+    html = html.split("{{TITLE}}").join(escAttr(title))
+      .split("{{DESCRIPTION}}").join(escAttr(desc))
+      .split("{{THEME_COLOR}}").join(THEMES[d.theme].linen);
+    var hasShare = !!(state.photo || state.keepPhoto) || opts.share;
+    html = base && slug
+      ? html.split("{{OG_URL}}").join(escAttr(base + slug + "/"))
+      : html.replace(/<meta property="og:url" content="\{\{OG_URL\}\}">\n?/, "");
+    html = base && slug && hasShare
+      ? html.split("{{OG_IMAGE}}").join(escAttr(base + slug + "/share.jpg"))
+      : html.replace(/<meta property="og:image" content="\{\{OG_IMAGE\}\}">\n?/, "");
+    html = html.replace(/<!-- The invitation's details\.[^>]*-->\n/, "");
+    if (opts.preview === "open") html = html.replace('<html lang="en">', '<html lang="en" data-preview="open">');
+    return html;
+  }
+
+  // ---------- Link-preview image (share.jpg, 1200x630) ----------
+  async function makeShare(d) {
+    var t = THEMES[d.theme], W = 1200, H = 630, cv = make("canvas", { width: W, height: H }), c = cv.getContext("2d");
+    try { await Promise.all(['96px "Great Vibes"', '30px "Marcellus"', 'italic 30px "Cormorant Garamond"'].map(function (f) { return document.fonts.load(f); })); } catch (e) { /* fall back to system fonts */ }
+    c.fillStyle = t.linen; c.fillRect(0, 0, W, H);
+    var g = c.createRadialGradient(W / 2, 0, 0, W / 2, 0, W * .7); g.addColorStop(0, t.card); g.addColorStop(1, "rgba(255,255,255,0)");
+    c.fillStyle = g; c.fillRect(0, 0, W, H);
+    c.strokeStyle = t.soft; c.lineWidth = 2; c.strokeRect(22, 22, W - 44, H - 44);
+    c.strokeStyle = t.faint; c.lineWidth = 1; c.strokeRect(32, 32, W - 64, H - 64);
+    var textX = W / 2, textW = W - 160;
+    if (state.photo) {
+      var img = state.photo.img, box = 520, s = Math.min(box / img.naturalWidth, box / img.naturalHeight);
+      var iw = img.naturalWidth * s, ih = img.naturalHeight * s;
+      c.drawImage(img, 60 + (box - iw) / 2, (H - ih) / 2, iw, ih);
+      textX = 60 + box + (W - 60 - box - 60) / 2; textW = W - box - 160;
+    }
+    c.textAlign = "center"; c.textBaseline = "middle";
+    function fit(font, size, text, maxW) { do { c.font = font.replace("{s}", size); size -= 2; } while (c.measureText(text).width > maxW && size > 18); }
+    c.fillStyle = t.inkSoft; fit('{s}px "Marcellus", Georgia, serif', 22, "THE WEDDING OF", textW);
+    if ("letterSpacing" in c) c.letterSpacing = "6px";
+    c.fillText("THE WEDDING OF", textX, 170);
+    if ("letterSpacing" in c) c.letterSpacing = "0px";
+    var n1 = str(d.person1.name), n2 = str(d.person2.name);
+    c.fillStyle = t.accent;
+    fit('{s}px "Great Vibes", cursive', 92, n1, textW); c.fillText(n1, textX, 245);
+    c.font = 'italic 44px "Cormorant Garamond", Georgia, serif'; c.fillText("&", textX, 312);
+    fit('{s}px "Great Vibes", cursive', 92, n2, textW); c.fillText(n2, textX, 380);
+    c.fillStyle = t.ink; fit('{s}px "Marcellus", Georgia, serif', 28, longDate(d.date).toUpperCase(), textW);
+    c.fillText(longDate(d.date).toUpperCase(), textX, 462);
+    var venueLine = [str(d.venue.name), str(d.venue.area)].filter(Boolean).join(", ");
+    c.fillStyle = t.inkSoft; fit('italic {s}px "Cormorant Garamond", Georgia, serif', 30, venueLine, textW);
+    c.fillText(venueLine, textX, 505);
+    return canvasBlob(cv, "image/jpeg", 0.88);
+  }
+
+  // ---------- Validation ----------
+  function validate(d) {
+    var errs = [], warns = [], bad = [];
+    function need(ok, msg, el) { if (!ok) { errs.push(msg); if (el) bad.push(el); } }
+    Array.prototype.forEach.call(document.querySelectorAll("[aria-invalid]"), function (e) { e.removeAttribute("aria-invalid"); });
+    need(str(d.person1.name), "Add the first name.", $("p1name"));
+    need(str(d.person2.name), "Add the second name.", $("p2name"));
+    need(/^\d{4}-\d{2}-\d{2}$/.test(d.date), "Pick the wedding date.", $("date"));
+    need(/^\d{2}:\d{2}$/.test(d.ceremony.time), "Add the ceremony time (the countdown uses it).", $("cerTime"));
+    need(str(d.venue.name), "Add the venue name.", $("venueName"));
+    var waRows = Array.prototype.filter.call($("contactRows").children, function (r) { return r._get().whatsapp.length >= 8; });
+    need(waRows.length > 0, "Add at least one contact with a WhatsApp number (country code + number, e.g. 94770000001).",
+      $("contactRows").children[0] && $("contactRows").children[0]._wa);
+    need(/^[a-z0-9]+(-[a-z0-9]+)*$/.test(str($("slug").value)), "Folder name can only use lowercase letters, numbers and dashes (e.g. nimal-kumudu).", $("slug"));
+    var b = str($("baseUrl").value);
+    need(!b || /^https?:\/\/[^\s]+$/.test(b), "Site address must start with https:// (e.g. https://username.github.io/invites/).", $("baseUrl"));
+    if (!state.photo && !state.keepPhoto) warns.push("No photo: the invitation will open straight onto the names.");
+    if (!b) warns.push("No site address: the WhatsApp link preview won't show an image.");
+    bad.forEach(function (e) { e.setAttribute("aria-invalid", "true"); });
+    renderList($("errors"), errs); renderList($("warnings"), warns);
+    if (bad[0]) bad[0].focus();
+    return errs.length === 0;
+  }
+  function renderList(ul, items) {
+    ul.textContent = "";
+    items.forEach(function (t) { ul.appendChild(make("li", { text: t })); });
+    ul.hidden = !items.length;
+  }
+
+  // ---------- Download ----------
+  function download(blob, name) {
+    var a = make("a", { href: URL.createObjectURL(blob), download: name });
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 4000);
+  }
+  async function generate(zipIt) {
+    if (!state.template) { $("noTemplate").hidden = false; return; }
+    var d = readForm();
+    if (!validate(d)) return;
+    var slug = str($("slug").value), html = buildHtml(d, { share: !!state.photo });
+    var htmlBlob = new Blob([html], { type: "text/html;charset=utf-8" });
+    if (zipIt && window.JSZip) {
+      var zip = new JSZip(), dir = zip.folder(slug);
+      dir.file("index.html", htmlBlob);
+      if (state.photo) { dir.file(state.photo.name, state.photo.blob); dir.file("share.jpg", await makeShare(d)); }
+      download(await zip.generateAsync({ type: "blob" }), slug + ".zip");
+    } else {
+      download(htmlBlob, "index.html");
+      if (zipIt && state.photo) { download(state.photo.blob, state.photo.name); download(await makeShare(d), "share.jpg"); }
+    }
+    showResult(slug, zipIt && !!window.JSZip);
+  }
+  function showResult(slug, zipped) {
+    var url = (baseUrl() || "https://<username>.github.io/invites/") + slug + "/";
+    $("rFolder").textContent = zipped ? slug : slug + " (put the downloaded files in a folder with this name)";
+    $("rUrl").textContent = url;
+    $("rGuest").textContent = url + "#Mr-and-Mrs-Silva";
+    $("result").hidden = false;
+  }
+  $("btnZip").addEventListener("click", function () { generate(true); });
+  $("btnHtml").addEventListener("click", function () { generate(false); });
+  $("copyLink").addEventListener("click", function () {
+    var t = $("rGuest").textContent;
+    try { navigator.clipboard.writeText(t).then(function () { $("copyLink").textContent = "Copied"; }); } catch (e) { /* select manually */ }
+  });
+
+  // ---------- Preview ----------
+  var frame = $("preview");
+  function previewData(d) {
+    var copy = JSON.parse(JSON.stringify(d));
+    if (state.photo) copy.photo.file = state.photo.url;
+    else if (state.keepPhoto && baseUrl() && str($("slug").value)) copy.photo.file = baseUrl() + str($("slug").value) + "/" + state.keepPhoto.file;
+    else delete copy.photo.file;
+    return copy;
+  }
+  function refreshPreview() {
+    if (!state.template) return;
+    var d = readForm(), y = 0;
+    try { y = frame.contentWindow.scrollY; } catch (e) { y = 0; }
+    frame.onload = function () { try { if (state.view === "letter") frame.contentWindow.scrollTo(0, y); } catch (e) { /* ignore */ } };
+    frame.srcdoc = buildHtml(d, { dataOverride: previewData(d), preview: state.view === "letter" ? "open" : "" });
+  }
+  var refreshSoon = debounce(refreshPreview, 350);
+  function setView(v) {
+    state.view = v;
+    $("viewLetter").setAttribute("aria-pressed", String(v === "letter"));
+    $("viewCover").setAttribute("aria-pressed", String(v === "cover"));
+    refreshPreview();
+  }
+  $("viewLetter").addEventListener("click", function () { setView("letter"); });
+  $("viewCover").addEventListener("click", function () { setView("cover"); });
+  $("openTab").addEventListener("click", function () {
+    if (!state.template) return;
+    var d = readForm();
+    var url = URL.createObjectURL(new Blob([buildHtml(d, { dataOverride: previewData(d) })], { type: "text/html" }));
+    window.open(url, "_blank", "noopener");
+  });
+
+  // ---------- Slug, base URL, final URL ----------
+  function autoSlug() {
+    if (state.slugTouched) return;
+    var a = slugify($("p1name").value), b = slugify($("p2name").value);
+    $("slug").value = [a, b].filter(Boolean).join("-");
+  }
+  function showFinalUrl() {
+    $("finalUrl").textContent = (baseUrl() || "https://<username>.github.io/invites/") + (str($("slug").value) || "<folder>") + "/";
+  }
+  $("slug").addEventListener("input", function () { state.slugTouched = true; });
+  $("baseUrl").addEventListener("input", function () { store(BASE_KEY, str(this.value)); });
+  $("cc").addEventListener("input", function () {
+    Array.prototype.forEach.call($("contactRows").children, function (r) {
+      if (r._wa.dataset.touched !== "1") r._wa.value = toIntl(r.querySelector("input[type=tel]").value, $("cc").value);
+    });
+  });
+
+  // ---------- Draft ----------
+  var saveDraft = debounce(function () {
+    store(DRAFT_KEY, JSON.stringify({ data: readForm(), slug: str($("slug").value), slugTouched: state.slugTouched, samplePhoto: !!state.samplePhoto && !!state.photo }));
+  }, 600);
+  function changed() {
+    autoSlug(); showFinalUrl(); refreshSoon(); saveDraft();
+    $("result").hidden = true;
+  }
+  $("formPane").addEventListener("input", changed);
+  $("formPane").addEventListener("change", changed);
+
+  // ---------- Header actions ----------
+  function resetPhoto() { if (state.photo) URL.revokeObjectURL(state.photo.url); state.photo = null; state.keepPhoto = null; state.samplePhoto = false; showThumb(); }
+  async function startSample() {
+    resetPhoto(); state.slugTouched = false;
+    fillForm(state.sample); flash("");
+    state.samplePhoto = true;
+    await loadSamplePhoto();
+    changed();
+  }
+  $("btnSample").addEventListener("click", startSample);
+  $("btnBlank").addEventListener("click", function () {
+    resetPhoto(); state.slugTouched = false;
+    fillForm({ person1: { relation: "Son of" }, person2: { relation: "Daughter of" }, utcOffset: "+05:30", rsvp: { maxGuests: 10 },
+      timeline: [{ title: "Guests arrive" }, { title: "Ceremony", key: true }, { title: "Celebrations close" }] });
+    $("slug").value = ""; flash(""); changed();
+  });
+  $("btnLoad").addEventListener("click", function () { $("loadFile").click(); });
+  $("loadFile").addEventListener("change", function () {
+    var f = this.files && this.files[0];
+    this.value = "";
+    if (!f) return;
+    f.text().then(function (txt) {
+      var d = extractData(txt);
+      resetPhoto(); state.slugTouched = false;
+      fillForm(d);
+      if (d.photo && d.photo.file) state.keepPhoto = { file: d.photo.file, width: d.photo.width, height: d.photo.height };
+      showThumb();
+      flash("Loaded " + f.name + ". Check the folder name, make your changes, then download again.");
+      changed();
+    }).catch(function (e) { flash("Couldn't load that file: " + e.message); });
+  });
+
+  // ---------- Mobile tabs ----------
+  function setTab(t) {
+    $("main").setAttribute("data-tab", t);
+    $("tabForm").setAttribute("aria-selected", String(t === "form"));
+    $("tabPreview").setAttribute("aria-selected", String(t === "preview"));
+    if (t === "preview") refreshPreview();
+  }
+  $("tabForm").addEventListener("click", function () { setTab("form"); });
+  $("tabPreview").addEventListener("click", function () { setTab("preview"); });
+
+  // ---------- Start ----------
+  (function initBase() {
+    var saved = recall(BASE_KEY);
+    if (saved) { $("baseUrl").value = saved; return; }
+    if (/^https?:$/.test(location.protocol) && !/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) {
+      $("baseUrl").value = location.origin + location.pathname.replace(/[^/]*$/, "");
+    }
+  })();
+  fetch("template/invite.html").then(function (r) {
+    if (!r.ok) throw new Error(r.status);
+    return r.text();
+  }).then(async function (tpl) {
+    state.template = tpl;
+    state.sample = extractData(tpl);
+    var draft = null;
+    try { draft = JSON.parse(recall(DRAFT_KEY) || "null"); } catch (e) { draft = null; }
+    if (draft && draft.data) {
+      fillForm(draft.data);
+      $("slug").value = draft.slug || "";
+      state.slugTouched = !!draft.slugTouched;
+      if (draft.samplePhoto) { state.samplePhoto = true; await loadSamplePhoto(); }
+      else if (draft.data.photo && draft.data.photo.file) flash("Your draft was restored. Choose the photo again before downloading.");
+      changed();
+    } else {
+      await startSample();
+    }
+  }).catch(function () {
+    $("noTemplate").hidden = false;
+    fillForm({});
+  });
+})();
+</script>
+</body>
+</html>
